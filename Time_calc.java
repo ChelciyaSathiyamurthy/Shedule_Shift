@@ -1,12 +1,7 @@
 package Time_Calculation;
-
-import java.time.Duration;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalTime;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 
 public class Time_calc {
 
@@ -21,40 +16,47 @@ public class Time_calc {
         Instant end = null;
         int day = 1;
 
-        for (String i : splitted_times) {
-            String[] day_wise_timing = i.split("-");
-            if (day_wise_timing.length == 3) {
-                LocalTime startTime = parseTimeString(day_wise_timing[0]);
-                LocalTime endTime = parseTimeString(day_wise_timing[1]);
-                LocalDate ld=LocalDate.of(2024,05, 06);
-                Instant startTimeInstant = convertToInstant(startTime,ld);
-               
-                Instant endTimeInstant = convertToInstant(endTime,ld);
-                ld.plusDays(1);
-//                System.out.println(startTimeInstant);
-//                System.out.println(endTimeInstant);
-                if (StartTime1 == null && EndTime1 == null) {
-                	StartTime1 = startTime;
-                	EndTime1 = endTime;
-                } else {
-                    if (!StartTime1.equals(startTime) || !EndTime1.equals(endTime)) {
-                        regularSchedule = false;
+        try {
+            for (String i : splitted_times) {
+                String[] day_wise_timing = i.split("-");
+                if (day_wise_timing.length == 3) {
+                    LocalTime startTime = parseTimeString(day_wise_timing[0]);
+                    LocalTime endTime = parseTimeString(day_wise_timing[1]);
+                    Duration breakTime = parseBreakTime(day_wise_timing[2]);
+                    LocalDate currentDate = LocalDate.of(2024, 5, 6); 
+                    Instant startTimeInstant = convertToInstant(startTime, currentDate);
+
+                    Instant endTimeInstant = convertToInstant(endTime, currentDate);
+
+                    if (StartTime1 == null && EndTime1 == null) {
+                        StartTime1 = startTime;
+                        EndTime1 = endTime;
+                    } else {
+                        if (!StartTime1.equals(startTime) || !EndTime1.equals(endTime)) {
+                            regularSchedule = false;
+                        }
                     }
+                    result.append(view_Work_Duration(startTime, endTime, breakTime, day));
+                    if (end != null) {
+                        Duration duration = Duration_Between_Days(end, startTimeInstant);
+                        result.append("Duration Between Days:\n");
+                        result.append("Hours: ").append(duration.toHours()).append("\n");
+                        result.append("Minutes: ").append(duration.toMinutes() % 60).append("\n");
+                    }
+                    end = endTimeInstant;
+                } else {
+                    result.append("Day").append(day).append(": OFF DAY\n");
                 }
-                result.append(view_Work_Duration(startTime, endTime, day,ld));
-                if (end != null) {
-                    Duration duration = Duration_Between_Days(end, startTimeInstant);
-                    result.append("Duration Between Days:\n");
-                    result.append("Hours: ").append(duration.toHours()).append("\n");
-                    result.append("Minutes: ").append(duration.toMinutes() % 60).append("\n");
-                }
-                end = endTimeInstant;
-            } else {
-                result.append("Day").append(day).append(": OFF DAY\n");
+                day++;
             }
-            day++;
-            
+        } catch (DateTimeParseException e) {
+            result.append("Error parsing time: ");
+        } catch (NumberFormatException e) {
+            result.append("Error parsing break time: ");
+        } catch (Exception e) {
+            result.append("An unexpected error occurred: ");
         }
+
         result.append(view_scheduleType(regularSchedule));
         return result.toString();
     }
@@ -64,22 +66,30 @@ public class Time_calc {
         return LocalTime.parse(timeString, formatter);
     }
 
-    Instant convertToInstant(LocalTime time,LocalDate date) {
-    	LocalDate currentDate = date;
-    	ZonedDateTime zonedDateTime = time.atDate(currentDate).atZone(ZoneId.of("Asia/Kolkata"));
-    	
+    Duration parseBreakTime(String breakTimeString) {
+        if (!breakTimeString.startsWith("B")) {
+            throw new IllegalArgumentException("Invalid break time format");
+        }
+        return Duration.ofMinutes(Integer.parseInt(breakTimeString.substring(1)));
+    }
+
+    Instant convertToInstant(LocalTime time, LocalDate date) {
+        LocalDate currentDate = date;
+        ZonedDateTime zonedDateTime = time.atDate(currentDate).atZone(ZoneId.of("Asia/Kolkata"));
+
         return zonedDateTime.toInstant();
     }
 
-    private String view_Work_Duration(LocalTime startTime, LocalTime endTime, int day,LocalDate ld) {
-        Duration workDuration = Duration.between(convertToInstant(startTime,ld), convertToInstant(endTime,ld));
+    private String view_Work_Duration(LocalTime startTime, LocalTime endTime, Duration breakTime, int day) {
+        Duration workDuration = Duration.between(convertToInstant(startTime, LocalDate.of(2024, 5, 6)),
+                convertToInstant(endTime, LocalDate.of(2024, 5, 6))).minus(breakTime);
         long hours = workDuration.toHours();
         long remainingMinutes = workDuration.toMinutes() % 60;
         StringBuilder result = new StringBuilder();
         result.append("Day ").append(day).append(" Timings:\n");
         result.append("Start Time: ").append(startTime).append(", End Time: ").append(endTime)
-                .append(", Break Time: ").append(30).append(" Hours ").append(hours)
-                .append(" Minutes ").append(remainingMinutes).append("\n");
+                .append(", Break Time: ").append(breakTime.toMinutes()).append(" Minutes ")
+                .append("Hours ").append(hours).append(", Minutes ").append(remainingMinutes).append("\n");
         return result.toString();
     }
 
@@ -104,4 +114,3 @@ public class Time_calc {
         System.out.println(emp1.splitting_times(times));
     }
 }
-
